@@ -1,0 +1,1 @@
+web: ez-user-service -port=$PORT
