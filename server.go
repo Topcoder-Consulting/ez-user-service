@@ -39,6 +39,7 @@ type ContactSObject struct {
 	Firstname                 string `force:",omitempty"`
 	Lastname                  string `force:",omitempty"`
 	Email                     string `force:",omitempty"`
+	MailingCountry            string `force:",omitempty"`
 	Topcoder_Handle__c        string `force:",omitempty"`
 	Topcoder_Last_Login__c    string `force:",omitempty"`
 	Topcoder_Member_Status__c string `force:",omitempty"`
@@ -103,7 +104,7 @@ func main() {
 func fetchMember(forceApi *force.ForceApi, handle string) (interface{}, int) {
 
 	list := &ContactQueryResponse{}
-	err := forceApi.Query("select id, name, firstname, lastname, email, topcoder_handle__c, topcoder_last_login__c, topcoder_member_status__c, topcoder_user_id__c from contact where topcoder_handle__c = '"+handle+"' limit 1", list)
+	err := forceApi.Query("select id, name, firstname, lastname, email, mailingcountry, topcoder_handle__c, topcoder_last_login__c, topcoder_member_status__c, topcoder_user_id__c from contact where topcoder_handle__c = '"+handle+"' limit 1", list)
 	if err != nil {
 		panic(err)
 	} else {
@@ -119,6 +120,7 @@ func fetchMember(forceApi *force.ForceApi, handle string) (interface{}, int) {
 				"name":      list.Records[0].Name,
 				"handle":    list.Records[0].Topcoder_Handle__c,
 				"email":     list.Records[0].Email,
+				"country":   list.Records[0].MailingCountry,
 				"status":    list.Records[0].Topcoder_Member_Status__c,
 				"lastLogin": list.Records[0].Topcoder_Last_Login__c,
 			}
