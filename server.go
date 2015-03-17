@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 )
 
 // SECURITY -- get the url params and check for an apiKey
@@ -93,12 +94,18 @@ func main() {
 		if slack.Token != os.Getenv("SLACK_TOKEN") {
 			return "Slack not authorized. Bad Slack token."
 		} else {
-			data, status := fetchMemberByHandle(forceApi, slack.Text)
+			var status int
+			var data interface{}
+			if strings.Contains(slack.Text, "@") {
+				data, status = fetchMemberByEmail(forceApi, slack.Text)
+			} else {
+				data, status = fetchMemberByHandle(forceApi, slack.Text)
+			}
 			if status == 200 {
 				member := data.(map[string]interface{})
 				return ("'" + member["handle"].(string) + "' is " + member["firstname"].(string) + " " + member["lastname"].(string) + " (" + member["email"].(string) + ") from " + member["country"].(string) + ". Current status is " + member["status"].(string) + " and their last login was " + member["lastLogin"].(string) + ".")
 			} else if status == 404 {
-				return "No member found with handle '" + slack.Text + "'."
+				return "Requested member not found."
 			} else {
 				return "Bummer. Service returned an error."
 			}
@@ -106,6 +113,39 @@ func main() {
 	})
 
 	m.Run()
+}
+
+func fetchMemberByEmail(forceApi *force.ForceApi, email string) (interface{}, int) {
+
+	list := &ContactQueryResponse{}
+	err := forceApi.Query("select id, name, firstname, lastname, email, mailingcountry, topcoder_handle__c, topcoder_last_login__c, topcoder_member_status__c, topcoder_user_id__c from contact where email = '"+email+"' limit 1", list)
+	if err != nil {
+		panic(err)
+	} else {
+
+		// found member in salesforce
+		if len(list.Records) == 1 {
+
+			id, _ := strconv.ParseInt(list.Records[0].Topcoder_User_Id__c, 0, 64)
+			member := map[string]interface{}{
+				"id":        id,
+				"firstname": list.Records[0].Firstname,
+				"lastname":  list.Records[0].Lastname,
+				"name":      list.Records[0].Name,
+				"handle":    list.Records[0].Topcoder_Handle__c,
+				"email":     list.Records[0].Email,
+				"country":   list.Records[0].MailingCountry,
+				"status":    list.Records[0].Topcoder_Member_Status__c,
+				"lastLogin": list.Records[0].Topcoder_Last_Login__c,
+			}
+			return member, 200
+
+			// not found in sfdc, try topcoder
+		} else {
+			return map[string]interface{}{}, 404
+		}
+	}
+
 }
 
 func fetchMemberByHandle(forceApi *force.ForceApi, handle string) (interface{}, int) {
