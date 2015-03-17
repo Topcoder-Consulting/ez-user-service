@@ -97,6 +97,8 @@ func main() {
 			if status == 200 {
 				member := data.(map[string]interface{})
 				return ("'" + member["handle"].(string) + "' is " + member["firstname"].(string) + " " + member["lastname"].(string) + " (" + member["email"].(string) + ") from " + member["country"].(string) + ". Current status is " + member["status"].(string) + " and their last login was " + member["lastLogin"].(string) + ".")
+			} else if status == 404 {
+				return "No member found with handle '" + slack.Text + "'"
 			} else {
 				return "Bummer. Service returned an error."
 			}
