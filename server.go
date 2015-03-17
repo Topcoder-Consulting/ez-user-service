@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/codegangsta/martini"
+	"github.com/codegangsta/martini-contrib/binding"
 	"github.com/martini-contrib/render"
 	"github.com/nimajalali/go-force/force"
 	"github.com/nimajalali/go-force/sobjects"
-	"github.com/codegangsta/martini-contrib/binding"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -48,15 +48,15 @@ type ContactSObject struct {
 
 // struct for contact object returned from query
 type SlackWhois struct {
-	Token 										string `form:"token"`
-	Team_id										string `form:"team_id"`
-	Team_domain								string `form:"team_domain"`
-	Channel_id								string `form:"channel_id"`
-	Channel_name							string `form:"channel_name"`
-	User_id										string `form:"user_id"`
-	User_name									string `form:"user_name"`
-	Command										string `form:"command"`
-	Text											string `form:"text"`
+	Token        string `form:"token"`
+	Team_id      string `form:"team_id"`
+	Team_domain  string `form:"team_domain"`
+	Channel_id   string `form:"channel_id"`
+	Channel_name string `form:"channel_name"`
+	User_id      string `form:"user_id"`
+	User_name    string `form:"user_name"`
+	Command      string `form:"command"`
+	Text         string `form:"text"`
 }
 
 type ContactQueryResponse struct {
@@ -85,23 +85,28 @@ func main() {
 	m.Use(render.Renderer())
 
 	m.Get("/m/:handle", middleware, func(r render.Render, params martini.Params, res http.ResponseWriter) {
-		member, status := fetchMember(forceApi, params["handle"])
+		member, status := fetchMemberByHandle(forceApi, params["handle"])
 		r.JSON(status, member)
 	})
 
-	m.Post("/slack/whois", middleware, binding.Bind(SlackWhois{}), func(slack SlackWhois, r render.Render, res http.ResponseWriter) {
+	m.Post("/slack/whois", middleware, binding.Bind(SlackWhois{}), func(slack SlackWhois) string {
 		if slack.Token != os.Getenv("SLACK_TOKEN") {
-			unauthorized(res)
+			return "Slack not authorized. Bad Slack token."
 		} else {
-			member, status := fetchMember(forceApi, slack.Text)
-			r.JSON(status, member)
+			data, status := fetchMemberByHandle(forceApi, slack.Text)
+			if status == 200 {
+				member := data.(map[string]interface{})
+				return ("'" + member["handle"].(string) + "' is " + member["firstname"].(string) + " " + member["lastname"].(string) + " (" + member["email"].(string) + ") from " + member["country"].(string) + ". Current status is " + member["status"].(string) + " and their last login was " + member["lastLogin"].(string) + ".")
+			} else {
+				return "Bummer. Service returned an error."
+			}
 		}
 	})
 
 	m.Run()
 }
 
-func fetchMember(forceApi *force.ForceApi, handle string) (interface{}, int) {
+func fetchMemberByHandle(forceApi *force.ForceApi, handle string) (interface{}, int) {
 
 	list := &ContactQueryResponse{}
 	err := forceApi.Query("select id, name, firstname, lastname, email, mailingcountry, topcoder_handle__c, topcoder_last_login__c, topcoder_member_status__c, topcoder_user_id__c from contact where topcoder_handle__c = '"+handle+"' limit 1", list)
@@ -126,7 +131,7 @@ func fetchMember(forceApi *force.ForceApi, handle string) (interface{}, int) {
 			}
 			return member, 200
 
-		// not found in sfdc, try topcoder
+			// not found in sfdc, try topcoder
 		} else {
 
 			// call the topcoder api
